@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-tap-highlight-color: transparent; }
+  body { @apply bg-cream text-navy font-sans antialiased; }
+  h1, h2, h3, h4 { @apply font-display font-bold tracking-tight; }
+}
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 font-bold transition active:scale-[.98] disabled:opacity-50 disabled:pointer-events-none focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-lemon; }
+  .btn-coral { @apply btn bg-coral text-white hover:bg-coral-dark shadow-soft; }
+  .btn-lemon { @apply btn bg-lemon text-navy hover:bg-lemon-dark; }
+  .btn-teal { @apply btn bg-teal text-white hover:bg-teal-dark; }
+  .btn-outline { @apply btn border-2 border-teal text-teal bg-white hover:bg-teal-light; }
+  .btn-ghost { @apply btn border-2 border-navy/15 text-navy bg-white hover:bg-navy/5; }
+  .btn-sm { @apply px-4 py-2 text-sm; }
+  .card { @apply rounded-3xl bg-white shadow-soft border border-navy/5; }
+  .input { @apply w-full rounded-xl border border-navy/15 bg-white px-4 py-2.5 text-navy placeholder:text-navy/35 focus:border-teal focus:outline-none focus:ring-4 focus:ring-teal/15; }
+  .label { @apply block text-sm font-semibold text-navy mb-1; }
+  .chip { @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold; }
+  .squiggle { position: relative; display: inline-block; }
+  .squiggle::after { content: ""; position: absolute; right: -2.1rem; top: .1rem; width: 1.8rem; height: 1.8rem; background: url("/art/spark.svg") no-repeat center / contain; }
+}
+
+@keyframes pop { 0% { transform: scale(.6); opacity: 0 } 60% { transform: scale(1.08); opacity: 1 } 100% { transform: scale(1) } }
+@keyframes shake { 0%,100% { transform: translateX(0) } 25% { transform: translateX(-6px) } 75% { transform: translateX(6px) } }
+@keyframes float { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
+@keyframes confetti { 0% { transform: translateY(-10vh) rotate(0); opacity: 1 } 100% { transform: translateY(110vh) rotate(720deg); opacity: .8 } }
+.animate-pop { animation: pop .35s ease-out both; }
+.animate-shake { animation: shake .3s ease-in-out 2; }
+.animate-float { animation: float 3s ease-in-out infinite; }
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+}

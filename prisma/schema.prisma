@@ -1,0 +1,193 @@
+// Lemonful data model.
+// SQLite for local development; switch `provider` to "postgresql" for production.
+// Enum-like fields are strings (SQLite has no enums); allowed values are documented
+// beside each field and enforced in src/lib/validation.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  role          String // PARENT | VOLUNTEER | ADMIN
+  firstName     String
+  lastName      String
+  emailVerified DateTime?
+  verifyToken   String?   @unique
+  country       String?
+  city          String?
+  postalCode    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  children         Child[]           @relation("ParentChildren")
+  volunteerProfile VolunteerProfile?
+  availability     Availability[]
+  assignedChildren Child[]           @relation("VolunteerChildren")
+  volunteerSessions TutoringSession[] @relation("VolunteerSessions")
+  hours            HourEntry[]
+  auditLogs        AuditLog[]
+}
+
+model VolunteerProfile {
+  userId           String   @id
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school           String
+  grade            Int
+  age              Int
+  bio              String   @default("")
+  whyVolunteer     String   @default("")
+  guardianName     String?
+  guardianEmail    String?
+  // PENDING_TRAINING -> AWAITING_APPROVAL -> APPROVED  (or PAUSED)
+  status           String   @default("PENDING_TRAINING")
+  completedModules String   @default("[]") // JSON array of training module ids
+  agreedToCode     Boolean  @default(false)
+  approvedAt       DateTime?
+  maxStudents      Int      @default(2)
+  createdAt        DateTime @default(now())
+}
+
+model Child {
+  id            String   @id @default(cuid())
+  parentId      String
+  parent        User     @relation("ParentChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  firstName     String
+  age           Int
+  // JUST_STARTING | SOME_SOUNDS | SIMPLE_WORDS | SIMPLE_BOOKS | NOT_SURE
+  readingLevel  String
+  notes         String   @default("")
+  avatar        String   @default("bear")
+  assessment    String? // JSON result of the onboarding assessment
+  assessedAt    DateTime?
+  startLesson   Int      @default(1)
+  volunteerId   String?
+  volunteer     User?    @relation("VolunteerChildren", fields: [volunteerId], references: [id], onDelete: SetNull)
+  matchedAt     DateTime?
+  createdAt     DateTime @default(now())
+
+  sessions   TutoringSession[]
+  results    ActivityResult[]
+  milestones Milestone[]
+  lessonProgress LessonProgress[]
+}
+
+// Weekly recurring availability. day: 0=Sun..6=Sat, hour: 0-23 (local time of the family / volunteer)
+model Availability {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day    Int
+  hour   Int
+
+  @@unique([userId, day, hour])
+}
+
+model TutoringSession {
+  id            String    @id @default(cuid())
+  childId       String
+  child         Child     @relation(fields: [childId], references: [id], onDelete: Cascade)
+  volunteerId   String
+  volunteer     User      @relation("VolunteerSessions", fields: [volunteerId], references: [id], onDelete: Cascade)
+  lessonNumber  Int
+  scheduledAt   DateTime
+  durationMin   Int       @default(45)
+  status        String    @default("SCHEDULED") // SCHEDULED | LIVE | COMPLETED | CANCELLED | MISSED
+  startedAt     DateTime?
+  endedAt       DateTime?
+  // Volunteer's post-session notes (visible to parent: summary only)
+  summaryForParent String?
+  privateNotes     String?
+  childEngagement  Int? // 1-5
+  lessonCompleted  Boolean @default(false)
+  // Parent feedback
+  parentRating   Int?
+  parentFeedback String?
+  createdAt      DateTime @default(now())
+
+  results ActivityResult[]
+  hourEntry HourEntry?
+}
+
+model LessonProgress {
+  id           String   @id @default(cuid())
+  childId      String
+  child        Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  lessonNumber Int
+  completedAt  DateTime @default(now())
+
+  @@unique([childId, lessonNumber])
+}
+
+model ActivityResult {
+  id         String   @id @default(cuid())
+  sessionId  String?
+  session    TutoringSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  childId    String
+  child      Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  activityId String
+  correct    Int
+  total      Int
+  detail     String   @default("{}") // JSON (e.g. letters/words practiced)
+  createdAt  DateTime @default(now())
+}
+
+model Milestone {
+  id         String   @id @default(cuid())
+  childId    String
+  child      Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  key        String
+  achievedAt DateTime @default(now())
+
+  @@unique([childId, key])
+}
+
+// Community-service hours: created automatically from sessions + training.
+model HourEntry {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind        String // SESSION | TRAINING | ADJUSTMENT
+  minutes     Int
+  description String
+  sessionId   String?  @unique
+  session     TutoringSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  date        DateTime @default(now())
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  topic     String
+  message   String
+  handled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// Every email the platform sends is recorded here (and delivered via Resend in production).
+model EmailOutbox {
+  id        String   @id @default(cuid())
+  to        String
+  subject   String
+  body      String
+  sentAt    DateTime @default(now())
+  delivered Boolean  @default(false)
+}
+
+// Who looked at / changed children's data, for safeguarding reviews.
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action    String
+  target    String
+  createdAt DateTime @default(now())
+}
